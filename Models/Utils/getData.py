@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset, Subset
 from sklearn.model_selection import StratifiedKFold
 
-FOLDER = "/kaggle/input/ai-vs-human-generated-dataset"
+FOLDER = "/kaggle/input/datasets/alessandrasala79/ai-vs-human-generated-dataset"
 CSV = FOLDER + "/train.csv"
 JUMLAH_PERKELAS = 2500
 
