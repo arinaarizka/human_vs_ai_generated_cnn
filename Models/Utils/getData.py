@@ -5,14 +5,14 @@ import torch
 from torch.utils.data import Dataset, Subset
 from sklearn.model_selection import StratifiedKFold
 
-FOLDER = "/kaggle/input/ai-vs-humas-generated-dataset"
+FOLDER = "/kaggle/input/ai-vs-human-generated-dataset"
 CSV = FOLDER + "/train.csv"
 JUMLAH_PERKELAS = 2500
 
 def ambil_data():
     df = pd.read_csv(CSV)
     asli = df[df["label"] == 0].sample(JUMLAH_PERKELAS, random_state=42)
-    ai = df[df["label"] == 01].sample(JUMLAH_PERKELAS, random_state=42)
+    ai = df[df["label"] == 1].sample(JUMLAH_PERKELAS, random_state=42)
     data = pd.concat([asli, ai]).reset_index(drop=True)
 
     print("jumlah data per kelas (0=asli, 1=ai)")
