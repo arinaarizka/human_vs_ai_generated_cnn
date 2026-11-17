@@ -28,12 +28,12 @@ class getImageLabel(Dataset):
             label = data["label"][i]
 
             # baca gambarnya
-            image = cv.reasize(cv.imread(FOLDER + "/" + nama_file), (100, 100)) / 255
+            image = cv.resize(cv.imread(FOLDER + "/" + nama_file), (100, 100)) / 255
             self.dataset.append([image, to_one_hot[label]])
 
     def __getitem__(self, item):
         feature, label = self.dataset[item]
-        return torch.tensor(feature, dtype=torch.float32), torch.tensor(label, dtpe=torch.float32)
+        return torch.tensor(feature, dtype=torch.float32), torch.tensor(label, dtype=torch.float32)
 
     def __len__(self):
         return len(self.dataset)
