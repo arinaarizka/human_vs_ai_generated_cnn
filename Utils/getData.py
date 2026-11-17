@@ -24,7 +24,7 @@ class getImageLabel(Dataset):
         self.dataset = []
         to_one_hot = np.eye(2) # jumlah kelas = 2
         for i in range(len(data)):
-            nama_file = data["file name"][i]
+            nama_file = data["file_name"][i]
             label = data["label"][i]
 
             # baca gambarnya
