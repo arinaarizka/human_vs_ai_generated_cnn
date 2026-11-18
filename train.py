@@ -1,4 +1,3 @@
-
 import os
 import copy
 import gc
@@ -21,17 +20,18 @@ if os.path.exists("/kaggle"):
 else:
     DATASET_PATH = "/root/.cache/kagglehub/datasets/alessandrasala79/ai-vs-human-generated-dataset/versions/4"
 
-TRAIN_CSV = "splits/train_split.csv"
-VAL_CSV = "splits/val_split.csv"
+DATA_CSV = "splits/data_5fold.csv"
+JUMLAH_FOLD = 5   
 
 BATCH_SIZE = 32
-EPOCHS = 5
+EPOCHS = 10 
 LEARNING_RATE = 0.001
 
 DEVICE = torch.device(
     "cuda" if torch.cuda.is_available() else "cpu"
 )
 
+CHECKPOINT_DIR = "checkpoints"   # diganti tiap fold
 os.makedirs("checkpoints", exist_ok=True)
 
 print("Device:", DEVICE)
@@ -81,11 +81,10 @@ class AIDataset(Dataset):
 
 #membaca data
 
-train_df = pd.read_csv(TRAIN_CSV)
-val_df = pd.read_csv(VAL_CSV)
+data_semua = pd.read_csv(DATA_CSV)  
 
-print("Jumlah data training:", len(train_df))
-print("Jumlah data validation:", len(val_df))
+print("Jumlah data seluruhnya:", len(data_semua))
+print(data_semua["label"].value_counts().sort_index())
 
 
 #fungsi training
@@ -209,7 +208,7 @@ def train_model(model, train_loader, val_loader, model_name):
                 "model_name": model_name,
                 "epoch": epoch + 1,
                 "accuracy": accuracy
-            }, f"checkpoints/{model_name}_best.pt")
+            }, f"{CHECKPOINT_DIR}/{model_name}_best.pt")   # DIUBAH: folder per fold
 
     model.load_state_dict(best_state)
 
@@ -220,112 +219,142 @@ def train_model(model, train_loader, val_loader, model_name):
 
     return history
 
-#konfigurasi model
-
-model_configs = [
-
-    {
-        "name": "CNN_Dua_Blok",
-        "model": cnnduablok(input_c=3, output=2),
-        "transform": transform_cnn
-    },
-
-    {
-        "name": "CNN_Tiga_Blok",
-        "model": cnntigablok(input_c=3, output=2),
-        "transform": transform_cnn
-    },
-
-    {
-        "name": "MobileNetV2",
-        "model": MobileNetV2Model(
-            num_classes=2,
-            pretrained=True,
-            freeze_features=False
-        ),
-        "transform": transform_mobilenet
-    }
-
-]
-
-#training ketiga model
+#training ketiga model, diulang untuk tiap fold 
 
 all_history = []
 
-for config in model_configs:
+for fold in range(1, JUMLAH_FOLD + 1):
 
-    model_name = config["name"]
+    # fold ini jadi data uji, fold lainnya jadi data latih
+    train_df = data_semua[data_semua["fold"] != fold]
+    val_df = data_semua[data_semua["fold"] == fold]
 
-    print("\n" + "=" * 60)
-    print("MEMULAI TRAINING:", model_name)
-    print("=" * 60)
+    # folder model dan file data uji per fold
+    CHECKPOINT_DIR = f"checkpoints/fold{fold}"
+    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+    val_df.to_csv(f"splits/test_fold{fold}.csv", index=False)
 
-    train_dataset = AIDataset(
-        train_df,
-        config["transform"]
-    )
+    print("\n" + "#" * 60)
+    print(f"FOLD {fold} DARI {JUMLAH_FOLD}")
+    print("Jumlah data training:", len(train_df))
+    print("Jumlah data validation:", len(val_df))
+    print("#" * 60)
 
-    val_dataset = AIDataset(
-        val_df,
-        config["transform"]
-    )
+    #konfigurasi model (dipindah ke sini supaya model dibuat baru tiap fold)
 
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=BATCH_SIZE,
-        shuffle=True,
-        num_workers=2,
-        pin_memory=torch.cuda.is_available()
-    )
+    model_configs = [
 
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=BATCH_SIZE,
-        shuffle=False,
-        num_workers=2,
-        pin_memory=torch.cuda.is_available()
-    )
+        {
+            "name": "CNN_Dua_Blok",
+            "model": cnnduablok(input_c=3, output=2),
+            "transform": transform_cnn
+        },
 
-    history = train_model(
-        config["model"],
-        train_loader,
-        val_loader,
-        model_name
-    )
+        {
+            "name": "CNN_Tiga_Blok",
+            "model": cnntigablok(input_c=3, output=2),
+            "transform": transform_cnn
+        },
 
-    all_history.extend(history)
+        {
+            "name": "MobileNetV2",
+            "model": MobileNetV2Model(
+                num_classes=2,
+                pretrained=True,
+                freeze_features=False
+            ),
+            "transform": transform_mobilenet
+        }
 
-    del config["model"]
-    del train_dataset, val_dataset
-    del train_loader, val_loader
+    ]
 
-    gc.collect()
+    history_fold = []
 
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
+    for config in model_configs:
+
+        model_name = config["name"]
+
+        print("\n" + "=" * 60)
+        print(f"FOLD {fold} | MEMULAI TRAINING:", model_name)
+        print("=" * 60)
+
+        train_dataset = AIDataset(
+            train_df,
+            config["transform"]
+        )
+
+        val_dataset = AIDataset(
+            val_df,
+            config["transform"]
+        )
+
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=BATCH_SIZE,
+            shuffle=True,
+            num_workers=2,
+            pin_memory=torch.cuda.is_available()
+        )
+
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=BATCH_SIZE,
+            shuffle=False,
+            num_workers=2,
+            pin_memory=torch.cuda.is_available()
+        )
+
+        history = train_model(
+            config["model"],
+            train_loader,
+            val_loader,
+            model_name
+        )
+
+        # catat nomor fold di tiap baris riwayat
+        for baris in history:
+            baris["fold"] = fold
+
+        history_fold.extend(history)
+
+        del config["model"]
+        del train_dataset, val_dataset
+        del train_loader, val_loader
+
+        gc.collect()
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    # simpan riwayat tiap selesai satu fold
+    all_history.extend(history_fold)
+    pd.DataFrame(history_fold).to_csv(f"training_results_fold{fold}.csv", index=False)
+    pd.DataFrame(all_history).to_csv("training_results.csv", index=False)
 
 #simpan hasil
 
 history_df = pd.DataFrame(all_history)
 
-history_df.to_csv(
-    "training_results.csv",
-    index=False
-)
-
 print("\n" + "=" * 60)
 print("SEMUA TRAINING SELESAI!")
 print("=" * 60)
 
-print("\nHASIL TERBAIK SETIAP MODEL:")
+print("\nHASIL TERBAIK SETIAP MODEL DI TIAP FOLD:")   # DIUBAH
 
 best_results = (
     history_df.sort_values("accuracy", ascending=False)
-    .groupby("model")
+    .groupby(["model", "fold"])
     .head(1)
+    .sort_values(["model", "fold"])
 )
 
 print(best_results.to_string(index=False))
 
-print("\nCheckpoint tersimpan di folder checkpoints/")
+print("\nRATA-RATA 5 FOLD:") 
+print(
+    best_results.groupby("model")[["accuracy", "precision", "recall", "f1_score"]]
+    .mean().round(4).to_string()
+)
+
+print("\nCheckpoint tersimpan di folder checkpoints/fold1 sampai fold5")
 print("Hasil training tersimpan di training_results.csv")
