@@ -16,11 +16,13 @@ from Models.model_cnn_modifikasi import cnntigablok
 from Models.MobileNetV2 import MobileNetV2Model
 
 #rules
+if os.path.exists("/kaggle"):
+    DATASET_PATH = "/kaggle/input/datasets/alessandrasala79/ai-vs-human-generated-dataset"
+else:
+    DATASET_PATH = "/root/.cache/kagglehub/datasets/alessandrasala79/ai-vs-human-generated-dataset/versions/4"
 
-DATASET_PATH = "/root/.cache/kagglehub/datasets/alessandrasala79/ai-vs-human-generated-dataset/versions/4"
-
-TRAIN_CSV = "/content/train_split.csv"
-VAL_CSV = "/content/val_split.csv"
+TRAIN_CSV = "splits/train_split.csv"
+VAL_CSV = "splits/val_split.csv"
 
 BATCH_SIZE = 32
 EPOCHS = 5
